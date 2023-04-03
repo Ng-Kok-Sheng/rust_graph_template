@@ -1,13 +1,12 @@
 use crate::api;
 use crate::schema::users;
-use actix_web::Error;
 use diesel::prelude::*;
 use juniper::{
     graphql_value, EmptySubscription, FieldError, FieldResult, GraphQLInputObject, GraphQLObject,
     RootNode,
 };
 
-#[derive(GraphQLObject, Queryable)]
+#[derive(GraphQLObject, Queryable, Clone)]
 #[graphql(description = "Customer information")]
 struct User {
     id: i32,
@@ -32,14 +31,33 @@ pub struct QueryRoot;
 #[juniper::graphql_object(Context = api::GraphQLContext)]
 impl QueryRoot {
     #[graphql(name = "get_user_by_id")]
-    fn get_user_by_id(_context: &api::GraphQLContext, _id: i32) -> FieldResult<User> {
-        Ok(User {
-            id: 1,
-            full_name: "Luke".to_owned(),
-            username: "Luke".to_owned(),
-            password: "Luke".to_owned(),
-            email_address: "Luke".to_owned(),
-        })
+    fn get_user_by_id(context: &api::GraphQLContext, query_id: i32) -> FieldResult<User> {
+        let conn: &mut PgConnection = &mut context.pool.get().unwrap();
+
+        match users::table
+            .filter(users::id.eq(query_id))
+            .limit(1)
+            .load::<User>(conn)
+        {
+            Ok(users) => Ok(users[0].clone()),
+            Err(err) => Err(FieldError::new(
+                err.to_string(),
+                graphql_value!({ "internal_error": {err.to_string()} }),
+            )),
+        }
+    }
+
+    #[graphql(name = "get_multiple_users")]
+    fn get_users(context: &api::GraphQLContext) -> FieldResult<Vec<User>> {
+        let conn: &mut PgConnection = &mut context.pool.get().unwrap();
+
+        match users::table.load::<User>(conn) {
+            Ok(users) => Ok(users),
+            Err(err) => Err(FieldError::new(
+                err.to_string(),
+                graphql_value!({ "internal_error": {err.to_string()} }),
+            )),
+        }
     }
 }
 
