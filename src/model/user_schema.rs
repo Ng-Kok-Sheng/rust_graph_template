@@ -1,8 +1,13 @@
 use crate::api;
+use crate::schema::users;
+use actix_web::Error;
 use diesel::prelude::*;
-use juniper::{EmptySubscription, FieldResult, GraphQLInputObject, GraphQLObject, RootNode};
+use juniper::{
+    graphql_value, EmptySubscription, FieldError, FieldResult, GraphQLInputObject, GraphQLObject,
+    RootNode,
+};
 
-#[derive(GraphQLObject)]
+#[derive(GraphQLObject, Queryable)]
 #[graphql(description = "Customer information")]
 struct User {
     id: i32,
@@ -12,8 +17,9 @@ struct User {
     email_address: String,
 }
 
-#[derive(GraphQLInputObject)]
-#[graphql(description = "Customer information input")]
+#[derive(GraphQLInputObject, Insertable)]
+#[diesel(table_name = users)]
+#[graphql(description = "New customer information")]
 struct NewUser {
     full_name: String,
     username: String,
@@ -41,16 +47,19 @@ pub struct MutationRoot;
 
 #[juniper::graphql_object(Context = api::GraphQLContext)]
 impl MutationRoot {
-    fn create_user(context: &api::GraphQLContext, _new_user: NewUser) -> FieldResult<User> {
-        let _conn: &PgConnection = &context.pool.get().unwrap();
+    fn create_user<'db>(context: &'db api::GraphQLContext, new_user: NewUser) -> FieldResult<User> {
+        let conn: &mut PgConnection = &mut context.pool.get().unwrap();
 
-        Ok(User {
-            id: 1,
-            full_name: "Luke".to_owned(),
-            username: "Luke".to_owned(),
-            password: "Luke".to_owned(),
-            email_address: "Luke".to_owned(),
-        })
+        match diesel::insert_into(users::table)
+            .values(&new_user)
+            .get_result::<User>(conn)
+        {
+            Ok(user) => Ok(user),
+            Err(err) => Err(FieldError::new(
+                err.to_string(),
+                graphql_value!({ "internal_error": {err.to_string()} }),
+            )),
+        }
     }
 }
 
