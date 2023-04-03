@@ -1,3 +1,4 @@
+# Create new user
 mutation createUser {
   createUser(newUser: {
     fullName: "Sample User",
@@ -10,5 +11,15 @@ mutation createUser {
     username,
     password,
     emailAddress,
+  }
+}
+
+# Query all user
+{
+  users {
+    get_multiple_users {
+      fullName
+      emailAddress
+    }
   }
 }

@@ -1,10 +1,7 @@
-use crate::api;
-use crate::schema::users;
+use crate::util::types;
+use crate::{schema::users, util::postgres::handle_error};
 use diesel::prelude::*;
-use juniper::{
-    graphql_value, EmptySubscription, FieldError, FieldResult, GraphQLInputObject, GraphQLObject,
-    RootNode,
-};
+use juniper::{FieldResult, GraphQLInputObject, GraphQLObject};
 
 #[derive(GraphQLObject, Queryable, Clone)]
 #[graphql(description = "Customer information")]
@@ -26,12 +23,12 @@ struct NewUser {
     email_address: String,
 }
 
-pub struct QueryRoot;
+pub struct UserQuery;
 
-#[juniper::graphql_object(Context = api::GraphQLContext)]
-impl QueryRoot {
+#[juniper::graphql_object(Context = types::GraphQLContext)]
+impl UserQuery {
     #[graphql(name = "get_user_by_id")]
-    fn get_user_by_id(context: &api::GraphQLContext, query_id: i32) -> FieldResult<User> {
+    fn get_user_by_id(context: &types::GraphQLContext, query_id: i32) -> FieldResult<User> {
         let conn: &mut PgConnection = &mut context.pool.get().unwrap();
 
         match users::table
@@ -40,32 +37,29 @@ impl QueryRoot {
             .load::<User>(conn)
         {
             Ok(users) => Ok(users[0].clone()),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
 
     #[graphql(name = "get_multiple_users")]
-    fn get_users(context: &api::GraphQLContext) -> FieldResult<Vec<User>> {
+    fn get_users(context: &types::GraphQLContext) -> FieldResult<Vec<User>> {
         let conn: &mut PgConnection = &mut context.pool.get().unwrap();
 
         match users::table.load::<User>(conn) {
             Ok(users) => Ok(users),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
 }
 
-pub struct MutationRoot;
+pub struct UserMutation;
 
-#[juniper::graphql_object(Context = api::GraphQLContext)]
-impl MutationRoot {
-    fn create_user<'db>(context: &'db api::GraphQLContext, new_user: NewUser) -> FieldResult<User> {
+#[juniper::graphql_object(Context = types::GraphQLContext)]
+impl UserMutation {
+    fn create_user<'db>(
+        context: &'db types::GraphQLContext,
+        new_user: NewUser,
+    ) -> FieldResult<User> {
         let conn: &mut PgConnection = &mut context.pool.get().unwrap();
 
         match diesel::insert_into(users::table)
@@ -73,17 +67,7 @@ impl MutationRoot {
             .get_result::<User>(conn)
         {
             Ok(user) => Ok(user),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
-}
-
-pub type Schema =
-    RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<api::GraphQLContext>>;
-
-pub fn create_schema() -> Schema {
-    Schema::new(QueryRoot {}, MutationRoot {}, EmptySubscription::new())
 }
