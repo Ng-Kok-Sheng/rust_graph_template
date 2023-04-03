@@ -1,0 +1,14 @@
+mutation createUser {
+  createUser(newUser: {
+    fullName: "Sample User",
+    username: "sample123",
+    password: "sample123",
+    emailAddress: "sample123"
+  }) {
+    id,
+    fullName,
+    username,
+    password,
+    emailAddress,
+  }
+}
