@@ -1,7 +1,8 @@
 use actix_web_lab::__reexports::tracing::log;
-use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
+use diesel::{pg::PgConnection, result::Error};
 use dotenv::dotenv;
+use juniper::{graphql_value, FieldError};
 use r2d2::Pool;
 use std::env;
 
@@ -17,4 +18,11 @@ pub fn get_postgres() -> PostgresPool {
     r2d2::Pool::builder()
         .build(migr)
         .expect("could not build connection pool")
+}
+
+pub fn handle_error(err: Error) -> FieldError {
+    FieldError::new(
+        err.to_string(),
+        graphql_value!({ "internal_error": {err.to_string()} }),
+    )
 }

@@ -1,10 +1,7 @@
-use crate::schema::users;
 use crate::util::types;
+use crate::{schema::users, util::postgres::handle_error};
 use diesel::prelude::*;
-use juniper::{
-    graphql_value, EmptySubscription, FieldError, FieldResult, GraphQLInputObject, GraphQLObject,
-    RootNode,
-};
+use juniper::{FieldResult, GraphQLInputObject, GraphQLObject};
 
 #[derive(GraphQLObject, Queryable, Clone)]
 #[graphql(description = "Customer information")]
@@ -26,10 +23,10 @@ struct NewUser {
     email_address: String,
 }
 
-pub struct QueryRoot;
+pub struct UserQuery;
 
 #[juniper::graphql_object(Context = types::GraphQLContext)]
-impl QueryRoot {
+impl UserQuery {
     #[graphql(name = "get_user_by_id")]
     fn get_user_by_id(context: &types::GraphQLContext, query_id: i32) -> FieldResult<User> {
         let conn: &mut PgConnection = &mut context.pool.get().unwrap();
@@ -40,10 +37,7 @@ impl QueryRoot {
             .load::<User>(conn)
         {
             Ok(users) => Ok(users[0].clone()),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
 
@@ -53,18 +47,15 @@ impl QueryRoot {
 
         match users::table.load::<User>(conn) {
             Ok(users) => Ok(users),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
 }
 
-pub struct MutationRoot;
+pub struct UserMutation;
 
 #[juniper::graphql_object(Context = types::GraphQLContext)]
-impl MutationRoot {
+impl UserMutation {
     fn create_user<'db>(
         context: &'db types::GraphQLContext,
         new_user: NewUser,
@@ -76,17 +67,7 @@ impl MutationRoot {
             .get_result::<User>(conn)
         {
             Ok(user) => Ok(user),
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({ "internal_error": {err.to_string()} }),
-            )),
+            Err(err) => Err(handle_error(err)),
         }
     }
-}
-
-pub type Schema =
-    RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<types::GraphQLContext>>;
-
-pub fn create_schema() -> Schema {
-    Schema::new(QueryRoot {}, MutationRoot {}, EmptySubscription::new())
 }

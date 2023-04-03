@@ -1,4 +1,4 @@
-use crate::model::user_schema;
+use crate::model;
 use crate::util::{postgres, types};
 use actix_web::{
     get, route,
@@ -9,7 +9,7 @@ use actix_web_lab::{__reexports::tracing::log, respond::Html};
 use juniper::http::{graphiql::graphiql_source, GraphQLRequest};
 
 pub fn get_user_scope() -> actix_web::Scope {
-    let schema = std::sync::Arc::new(user_schema::create_schema());
+    let schema = std::sync::Arc::new(model::create_schema());
 
     log::info!("Starting HTTP server on port 8080");
     log::info!("GraphiQL playground: http://localhost:8080/graphiql");
@@ -28,7 +28,7 @@ async fn graphql(
     // DB Connection Pool
     postgres: web::Data<postgres::PostgresPool>,
     //GraphQl Schema
-    schema: web::Data<user_schema::Schema>,
+    schema: web::Data<model::Schema>,
     // Incoming HTTP Request
     data: web::Json<GraphQLRequest>,
 ) -> impl Responder {
